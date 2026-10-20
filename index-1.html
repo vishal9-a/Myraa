@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#d6336c">
+<title>Myraa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f7f5fb;--card:#ffffff;--text:#1c1930;--muted:#6f6a88;--accent:#d6336c;--accent-text:#ffffff;--border:#e5e1f0;--bot:#ffffff}
+@media(prefers-color-scheme:dark){:root{--bg:#15131f;--card:#201c33;--text:#f0ecfa;--muted:#9b95b8;--accent:#ff6b9a;--accent-text:#1c1020;--border:#322d4d;--bot:#241f3a}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:"Mukta",system-ui,sans-serif;font-size:17px;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top,0px));background:var(--card);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:22px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.dot.think{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.6);opacity:.5}}
+@media(prefers-reduced-motion:reduce){.dot.think{animation:none;opacity:.5}}
+button{font:inherit;cursor:pointer}
+.icon{background:none;border:1px solid var(--border);color:var(--text);border-radius:10px;padding:6px 12px}
+#chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;line-height:1.45}
+.me{align-self:flex-end;background:var(--accent);color:var(--accent-text);border-bottom-right-radius:4px}
+.bot{align-self:flex-start;background:var(--bot);border:1px solid var(--border);border-bottom-left-radius:4px}
+.sys{align-self:center;color:var(--muted);font-size:14px;text-align:center}
+form{display:flex;gap:8px;padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--card);border-top:1px solid var(--border)}
+#input{flex:1;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:22px;padding:10px 16px;min-width:0}
+#input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.round{width:46px;height:46px;border-radius:50%;border:none;background:var(--accent);color:var(--accent-text);font-size:20px}
+.round.alt{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.round.on{background:var(--accent);color:var(--accent-text)}
+dialog{width:min(92vw,460px);max-height:88vh;border:1px solid var(--border);border-radius:16px;background:var(--card);color:var(--text);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog h2{margin:0 0 12px;font-size:20px}
+label{display:block;margin:12px 0 4px;font-weight:600}
+dialog input[type=text],dialog input[type=password]{width:100%;font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+.hint{color:var(--muted);font-size:14px;margin:4px 0 0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.row span{flex:1}
+.actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.btn{padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+.btn.main{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot" id="dot"></span>Myraa</div>
+  <button class="icon" id="openSettings" type="button">Settings</button>
+</header>
+
+<main id="chat" aria-live="polite"></main>
+
+<form id="form">
+  <button type="button" class="round alt" id="mic" aria-label="Bol kar likho">🎤</button>
+  <input id="input" type="text" placeholder="Myraa se baat karo..." autocomplete="off">
+  <button class="round" type="submit" aria-label="Bhejo">➤</button>
+</form>
+
+<dialog id="settings">
+  <h2>Settings</h2>
+  <label for="key">Gemini API key</label>
+  <input type="password" id="key" placeholder="AIza...">
+  <p class="hint">Key sirf aapke phone mein save hoti hai. aistudio.google.com se free mil jaati hai.</p>
+
+  <label for="model">Model</label>
+  <input type="text" id="model">
+
+  <label><input type="checkbox" id="speak"> Myraa jawab bol kar sunaye</label>
+
+  <label>Myraa ki yaadein</label>
+  <div id="memList"></div>
+  <p class="hint">Chat mein likho: "yaad rakho: mera naam Rahul hai" aur Myraa yaad rakhegi.</p>
+
+  <div class="actions">
+    <button class="btn main" id="save" type="button">Save</button>
+    <button class="btn" id="clear" type="button">Chat saaf karo</button>
+    <button class="btn" id="close" type="button">Band karo</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  var $ = function(s){ return document.querySelector(s); };
+
+  // Phone ke andar data save karna (agar fail ho to bhi app chalti rahe)
+  function load(k, d){ try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } }
+  function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+
+  var chat = load('myraa_chat', []);
+  var mem  = load('myraa_mem', []);
+  var cfg  = load('myraa_cfg', { key:'', model:'gemini-2.5-flash', speak:false });
+  var busy = false;
+
+  var chatEl = $('#chat'), inputEl = $('#input'), dot = $('#dot');
+
+  function addBubble(text, cls){
+    var d = document.createElement('div');
+    d.className = 'msg ' + cls;
+    d.textContent = text;
+    chatEl.appendChild(d);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function render(){
+    chatEl.innerHTML = '';
+    if(!chat.length){
+      addBubble('Namaste! Main Myraa hoon. Pehle Settings mein apni Gemini key daalo, phir mujhse kuch bhi poocho.', 'sys');
+    }
+    chat.forEach(function(m){ addBubble(m.text, m.role === 'user' ? 'me' : 'bot'); });
+  }
+
+  function systemPrompt(){
+    var p = 'Tum Myraa ho, ek dost jaisi AI assistant. User jis bhasha mein likhe (Hindi, Hinglish ya English) usi mein chhota, saaf aur pyaar se jawab do.';
+    if(mem.length){ p += '\nUser ke baare mein yaadein:\n- ' + mem.join('\n- '); }
+    return p;
+  }
+
+  function speak(text){
+    if(!cfg.speak || !('speechSynthesis' in window)) return;
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'hi-IN';
+      speechSynthesis.speak(u);
+    } catch(e){}
+  }
+
+  async function ask(){
+    var contents = chat.slice(-20).map(function(m){
+      return { role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] };
+    });
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+      encodeURIComponent(cfg.model || 'gemini-2.5-flash') + ':generateContent?key=' + encodeURIComponent(cfg.key);
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt() }] }, contents: contents })
+    });
+    var data = await res.json();
+    if(!res.ok){
+      var msg = (data && data.error && data.error.message) || 'Kuch galat ho gaya';
+      throw new Error(msg);
+    }
+    var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+    var text = parts ? parts.map(function(p){ return p.text || ''; }).join('') : '';
+    return text || 'Mujhe jawab nahi mila. Dobara try karo.';
+  }
+
+  async function send(text){
+    text = (text || '').trim();
+    if(!text || busy) return;
+    inputEl.value = '';
+
+    // "yaad rakho: ..." ko seedha memory mein save karo
+    var m = text.match(/^(yaad\s*rakh(?:o|na)?|remember)\s*[:\-]?\s*(.+)$/i);
+    if(m){
+      mem.push(m[2].trim());
+      save('myraa_mem', mem);
+      chat.push({ role:'user', text:text });
+      chat.push({ role:'model', text:'Theek hai, yaad rakh liya: ' + m[2].trim() });
+      save('myraa_chat', chat.slice(-60));
+      render();
+      return;
+    }
+
+    if(!cfg.key){
+      addBubble('Pehle Settings mein Gemini API key daalo.', 'sys');
+      return;
+    }
+
+    chat.push({ role:'user', text:text });
+    addBubble(text, 'me');
+    busy = true; dot.classList.add('think');
+    try {
+      var reply = await ask();
+      chat.push({ role:'model', text:reply });
+      addBubble(reply, 'bot');
+      speak(reply);
+    } catch(e){
+      chat.pop(); // fail hue message ko history se hatao
+      addBubble('Error: ' + e.message + '\nKey aur internet check karo.', 'sys');
+    }
+    save('myraa_chat', chat.slice(-60));
+    busy = false; dot.classList.remove('think');
+  }
+
+  $('#form').addEventListener('submit', function(e){ e.preventDefault(); send(inputEl.value); });
+
+  // Awaaz se likhna
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var micBtn = $('#mic');
+  if(!SR){ micBtn.style.display = 'none'; }
+  else {
+    var rec = new SR();
+    rec.lang = 'hi-IN';
+    rec.onresult = function(e){ send(e.results[0][0].transcript); };
+    rec.onend = function(){ micBtn.classList.remove('on'); };
+    rec.onerror = function(){ micBtn.classList.remove('on'); };
+    micBtn.addEventListener('click', function(){
+      try { rec.start(); micBtn.classList.add('on'); } catch(e){}
+    });
+  }
+
+  // Settings
+  var dlg = $('#settings');
+  function renderMem(){
+    var box = $('#memList');
+    box.innerHTML = '';
+    if(!mem.length){ var p = document.createElement('p'); p.className = 'hint'; p.textContent = 'Abhi koi yaad save nahi hai.'; box.appendChild(p); return; }
+    mem.forEach(function(t, i){
+      var r = document.createElement('div'); r.className = 'row';
+      var s = document.createElement('span'); s.textContent = t;
+      var b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = 'Hatao';
+      b.addEventListener('click', function(){ mem.splice(i, 1); save('myraa_mem', mem); renderMem(); });
+      r.appendChild(s); r.appendChild(b); box.appendChild(r);
+    });
+  }
+  $('#openSettings').addEventListener('click', function(){
+    $('#key').value = cfg.key; $('#model').value = cfg.model; $('#speak').checked = !!cfg.speak;
+    renderMem(); dlg.showModal();
+  });
+  $('#close').addEventListener('click', function(){ dlg.close(); });
+  $('#save').addEventListener('click', function(){
+    cfg = { key: $('#key').value.trim(), model: $('#model').value.trim() || 'gemini-2.5-flash', speak: $('#speak').checked };
+    save('myraa_cfg', cfg); dlg.close();
+  });
+  $('#clear').addEventListener('click', function(){ chat = []; save('myraa_chat', chat); render(); dlg.close(); });
+
+  // Home screen par install ke liye manifest
+  try {
+    var icon = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#d6336c"/><text x="256" y="350" font-size="300" font-family="sans-serif" font-weight="700" fill="#fff" text-anchor="middle">M</text></svg>');
+    var manifest = { name:'Myraa', short_name:'Myraa', start_url:'.', display:'standalone', background_color:'#15131f', theme_color:'#d6336c',
+      icons:[{ src:icon, sizes:'512x512', type:'image/svg+xml', purpose:'any' }] };
+    var link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type:'application/manifest+json' }));
+    document.head.appendChild(link);
+  } catch(e){}
+
+  render();
+})();
+</script>
+</body>
+</html>
