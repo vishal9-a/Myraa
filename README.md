@@ -1,2 +1,2 @@
 # Myraa
-Myraa ai
+Myraa
